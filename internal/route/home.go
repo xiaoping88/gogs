@@ -19,10 +19,7 @@ import (
 )
 
 const (
-	HOME                  = "home"
-	EXPLORE_REPOS         = "explore/repos"
-	EXPLORE_USERS         = "explore/users"
-	EXPLORE_ORGANIZATIONS = "explore/organizations"
+	HOME = "home"
 )
 
 func Home(c *context.Context) {
@@ -45,41 +42,6 @@ func Home(c *context.Context) {
 
 	c.Data["PageIsHome"] = true
 	c.Success(HOME)
-}
-
-func ExploreRepos(c *context.Context) {
-	c.Data["Title"] = c.Tr("explore")
-	c.Data["PageIsExplore"] = true
-	c.Data["PageIsExploreRepositories"] = true
-
-	page := c.QueryInt("page")
-	if page <= 0 {
-		page = 1
-	}
-
-	keyword := c.Query("q")
-	repos, count, err := db.SearchRepositoryByName(&db.SearchRepoOptions{
-		Keyword:  keyword,
-		UserID:   c.UserID(),
-		OrderBy:  "updated_unix DESC",
-		Page:     page,
-		PageSize: conf.UI.ExplorePagingNum,
-	})
-	if err != nil {
-		c.Error(err, "search repository by name")
-		return
-	}
-	c.Data["Keyword"] = keyword
-	c.Data["Total"] = count
-	c.Data["Page"] = paginater.New(int(count), conf.UI.ExplorePagingNum, page, 5)
-
-	if err = db.RepositoryList(repos).LoadAttributes(); err != nil {
-		c.Error(err, "load attributes")
-		return
-	}
-	c.Data["Repos"] = repos
-
-	c.Success(EXPLORE_REPOS)
 }
 
 type UserSearchOptions struct {
@@ -130,36 +92,6 @@ func RenderUserSearch(c *context.Context, opts *UserSearchOptions) {
 	c.Data["Users"] = users
 
 	c.Success(opts.TplName)
-}
-
-func ExploreUsers(c *context.Context) {
-	c.Data["Title"] = c.Tr("explore")
-	c.Data["PageIsExplore"] = true
-	c.Data["PageIsExploreUsers"] = true
-
-	RenderUserSearch(c, &UserSearchOptions{
-		Type:     db.UserIndividual,
-		Counter:  db.CountUsers,
-		Ranger:   db.ListUsers,
-		PageSize: conf.UI.ExplorePagingNum,
-		OrderBy:  "updated_unix DESC",
-		TplName:  EXPLORE_USERS,
-	})
-}
-
-func ExploreOrganizations(c *context.Context) {
-	c.Data["Title"] = c.Tr("explore")
-	c.Data["PageIsExplore"] = true
-	c.Data["PageIsExploreOrganizations"] = true
-
-	RenderUserSearch(c, &UserSearchOptions{
-		Type:     db.UserOrganization,
-		Counter:  db.CountOrganizations,
-		Ranger:   db.Organizations,
-		PageSize: conf.UI.ExplorePagingNum,
-		OrderBy:  "updated_unix DESC",
-		TplName:  EXPLORE_ORGANIZATIONS,
-	})
 }
 
 func NotFound(c *macaron.Context, l i18n.Locale) {

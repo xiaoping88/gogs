@@ -100,14 +100,6 @@
 									<a class="item{{if .PageIsHome}} active{{end}}" href="{{AppSubURL}}/">{{.i18n.Tr "home"}}</a>
 								{{end}}
 
-								<a class="item{{if .PageIsExplore}} active{{end}}" href="{{AppSubURL}}/explore/repos">{{.i18n.Tr "explore"}}</a>
-								{{/*<div class="item">
-									<div class="ui icon input">
-									<input class="searchbox" type="text" placeholder="{{.i18n.Tr "search_project"}}">
-									<i class="search icon"></i>
-									</div>
-									</div>*/}}
-
 								{{if .IsLogged}}
 									<div class="right menu">
 										<div class="ui dropdown head link jump item poping up" data-content="{{.i18n.Tr "create_new"}}" data-variation="tiny inverted">
