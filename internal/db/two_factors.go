@@ -21,8 +21,6 @@ import (
 )
 
 // TwoFactorsStore is the persistent interface for 2FA.
-//
-// NOTE: All methods are sorted in alphabetical order.
 type TwoFactorsStore interface {
 	// Create creates a new 2FA token and recovery codes for given user. The "key"
 	// is used to encrypt and later decrypt given "secret", which should be
@@ -32,8 +30,8 @@ type TwoFactorsStore interface {
 	// GetByUserID returns the 2FA token of given user. It returns
 	// ErrTwoFactorNotFound when not found.
 	GetByUserID(ctx context.Context, userID int64) (*TwoFactor, error)
-	// IsUserEnabled returns true if the user has enabled 2FA.
-	IsUserEnabled(ctx context.Context, userID int64) bool
+	// IsEnabled returns true if the user has enabled 2FA.
+	IsEnabled(ctx context.Context, userID int64) bool
 }
 
 var TwoFactors TwoFactorsStore
@@ -114,7 +112,7 @@ func (db *twoFactors) GetByUserID(ctx context.Context, userID int64) (*TwoFactor
 	return tf, nil
 }
 
-func (db *twoFactors) IsUserEnabled(ctx context.Context, userID int64) bool {
+func (db *twoFactors) IsEnabled(ctx context.Context, userID int64) bool {
 	var count int64
 	err := db.WithContext(ctx).Model(new(TwoFactor)).Where("user_id = ?", userID).Count(&count).Error
 	if err != nil {

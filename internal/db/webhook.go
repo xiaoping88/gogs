@@ -10,7 +10,8 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"net/url"
 	"strings"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"gogs.io/gogs/internal/httplib"
 	"gogs.io/gogs/internal/netutil"
 	"gogs.io/gogs/internal/sync"
+	"gogs.io/gogs/internal/testutil"
 )
 
 var HookQueue = sync.NewUniqueQueue(1000)
@@ -239,7 +241,7 @@ func CreateWebhook(w *Webhook) error {
 var _ errutil.NotFound = (*ErrWebhookNotExist)(nil)
 
 type ErrWebhookNotExist struct {
-	args map[string]interface{}
+	args map[string]any
 }
 
 func IsErrWebhookNotExist(err error) bool {
@@ -262,7 +264,7 @@ func getWebhook(bean *Webhook) (*Webhook, error) {
 	if err != nil {
 		return nil, err
 	} else if !has {
-		return nil, ErrWebhookNotExist{args: map[string]interface{}{"webhookID": bean.ID}}
+		return nil, ErrWebhookNotExist{args: map[string]any{"webhookID": bean.ID}}
 	}
 	return bean, nil
 }
@@ -492,7 +494,7 @@ func (t *HookTask) AfterSet(colName string, _ xorm.Cell) {
 	}
 }
 
-func (t *HookTask) ToJSON(v interface{}) string {
+func (t *HookTask) ToJSON(v any) string {
 	p, err := jsoniter.Marshal(v)
 	if err != nil {
 		log.Error("Marshal [%d]: %v", t.ID, err)
@@ -522,7 +524,7 @@ func createHookTask(e Engine, t *HookTask) error {
 var _ errutil.NotFound = (*ErrHookTaskNotExist)(nil)
 
 type ErrHookTaskNotExist struct {
-	args map[string]interface{}
+	args map[string]any
 }
 
 func IsHookTaskNotExist(err error) bool {
@@ -548,7 +550,7 @@ func GetHookTaskOfWebhookByUUID(webhookID int64, uuid string) (*HookTask, error)
 	if err != nil {
 		return nil, err
 	} else if !has {
-		return nil, ErrHookTaskNotExist{args: map[string]interface{}{"webhookID": webhookID, "uuid": uuid}}
+		return nil, ErrHookTaskNotExist{args: map[string]any{"webhookID": webhookID, "uuid": uuid}}
 	}
 	return hookTask, nil
 }
@@ -676,6 +678,11 @@ func prepareWebhooks(e Engine, repo *Repository, event HookEventType, p api.Payl
 
 // PrepareWebhooks adds all active webhooks to task queue.
 func PrepareWebhooks(repo *Repository, event HookEventType, p api.Payloader) error {
+	// NOTE: To prevent too many cascading changes in a single refactoring PR, we
+	// choose to ignore this function in tests.
+	if x == nil && testutil.InTest {
+		return nil
+	}
 	return prepareWebhooks(x, repo, event, p)
 }
 
@@ -689,8 +696,13 @@ func TestWebhook(repo *Repository, event HookEventType, p api.Payloader, webhook
 }
 
 func (t *HookTask) deliver() {
-	if netutil.IsBlockedLocalHostname(t.URL, conf.Security.LocalNetworkAllowlist) {
-		t.ResponseContent = "Payload URL resolved to a local network address that is implicitly blocked."
+	payloadURL, err := url.Parse(t.URL)
+	if err != nil {
+		t.ResponseContent = fmt.Sprintf(`{"body": "Cannot parse payload URL: %v"}`, err)
+		return
+	}
+	if netutil.IsBlockedLocalHostname(payloadURL.Hostname(), conf.Security.LocalNetworkAllowlist) {
+		t.ResponseContent = `{"body": "Payload URL resolved to a local network address that is implicitly blocked."}`
 		return
 	}
 
@@ -763,7 +775,7 @@ func (t *HookTask) deliver() {
 		t.ResponseInfo.Headers[k] = strings.Join(vals, ",")
 	}
 
-	p, err := ioutil.ReadAll(resp.Body)
+	p, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.ResponseInfo.Body = fmt.Sprintf("read body: %s", err)
 		return
@@ -776,7 +788,7 @@ func (t *HookTask) deliver() {
 func DeliverHooks() {
 	tasks := make([]*HookTask, 0, 10)
 	_ = x.Where("is_delivered = ?", false).Iterate(new(HookTask),
-		func(idx int, bean interface{}) error {
+		func(idx int, bean any) error {
 			t := bean.(*HookTask)
 			t.deliver()
 			tasks = append(tasks, t)

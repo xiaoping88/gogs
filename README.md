@@ -32,7 +32,7 @@ The Gogs (`/gɑgz/`) project aims to build a simple, stable and extensible self-
 - Authentication via SMTP, LDAP, reverse proxy, GitHub.com and GitHub Enterprise with 2FA.
 - Customize HTML templates, static files and many others.
 - Rich database backend, including PostgreSQL, MySQL, SQLite3 and [TiDB](https://github.com/pingcap/tidb).
-- Have localization over [30 languages](https://crowdin.com/project/gogs).
+- Have localization over [31 languages](https://crowdin.com/project/gogs).
 
 ## 💾 Hardware requirements
 
@@ -91,7 +91,7 @@ There are 6 ways to install Gogs:
 
 - Thanks [Egon Elbre](https://twitter.com/egonelbre) for designing the original version of the logo.
 - Thanks [Crowdin](https://crowdin.com/project/gogs) for sponsoring open source translation plan.
-- Thanks [DigitalOcean](https://www.digitalocean.com), [VPSServer](https://www.vpsserver.com/), [Hosted.nl](https://www.hosted.nl/) and [BitLaunch](https://bitlaunch.io) for sponsoring VPS services.
+- Thanks [DigitalOcean](https://www.digitalocean.com), [VPSServer](https://www.vpsserver.com/), [Hosted.nl](https://www.hosted.nl/), [BitLaunch](https://bitlaunch.io), and [MonoVM](https://monovm.com/linux-vps/) for sponsoring VPS services.
 - Thanks [KeyCDN](https://www.keycdn.com/) for sponsoring CDN service.
 - Thanks [Buildkite](https://buildkite.com) for sponsoring open source CI/CD plan.
 

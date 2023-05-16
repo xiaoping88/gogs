@@ -18,17 +18,16 @@ func TestPerms(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
-
 	t.Parallel()
 
-	tables := []interface{}{new(Access)}
+	tables := []any{new(Access)}
 	db := &perms{
 		DB: dbtest.NewDB(t, "perms", tables...),
 	}
 
 	for _, tc := range []struct {
 		name string
-		test func(*testing.T, *perms)
+		test func(t *testing.T, db *perms)
 	}{
 		{"AccessMode", permsAccessMode},
 		{"Authorize", permsAuthorize},

@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/gogs/git-module"
-	"github.com/pkg/errors"
 	"github.com/unknwon/paginater"
 	log "unknwon.dev/clog/v2"
 
@@ -112,7 +111,7 @@ func renderDirectory(c *context.Context, treeLink string) {
 		}
 	}
 	c.Data["LatestCommit"] = latestCommit
-	c.Data["LatestCommitUser"] = db.ValidateCommitWithEmail(latestCommit)
+	c.Data["LatestCommitUser"] = tryGetUserByEmail(c.Req.Context(), latestCommit.Author.Email)
 
 	if c.Repo.CanEnableEditor() {
 		c.Data["CanAddFile"] = true
@@ -221,7 +220,7 @@ func renderFile(c *context.Context, entry *git.TreeEntry, treeLink, rawLink stri
 
 func setEditorconfigIfExists(c *context.Context) {
 	ec, err := c.Repo.Editorconfig()
-	if err != nil && !gitutil.IsErrRevisionNotExist(errors.Cause(err)) {
+	if err != nil && !gitutil.IsErrRevisionNotExist(err) {
 		log.Warn("setEditorconfigIfExists.Editorconfig [repo_id: %d]: %v", c.Repo.Repository.ID, err)
 		return
 	}
