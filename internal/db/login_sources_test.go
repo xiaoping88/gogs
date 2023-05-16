@@ -16,7 +16,9 @@ import (
 
 	"gogs.io/gogs/internal/auth"
 	"gogs.io/gogs/internal/auth/github"
+	"gogs.io/gogs/internal/auth/ldap"
 	"gogs.io/gogs/internal/auth/pam"
+	"gogs.io/gogs/internal/auth/smtp"
 	"gogs.io/gogs/internal/dbtest"
 	"gogs.io/gogs/internal/errutil"
 )
@@ -63,7 +65,9 @@ func TestLoginSource_BeforeCreate(t *testing.T) {
 	}
 
 	t.Run("CreatedUnix has been set", func(t *testing.T) {
-		s := &LoginSource{CreatedUnix: 1}
+		s := &LoginSource{
+			CreatedUnix: 1,
+		}
 		_ = s.BeforeCreate(db)
 		assert.Equal(t, int64(1), s.CreatedUnix)
 		assert.Equal(t, int64(0), s.UpdatedUnix)
@@ -77,21 +81,96 @@ func TestLoginSource_BeforeCreate(t *testing.T) {
 	})
 }
 
-func Test_loginSources(t *testing.T) {
+func TestLoginSource_BeforeUpdate(t *testing.T) {
+	now := time.Now()
+	db := &gorm.DB{
+		Config: &gorm.Config{
+			SkipDefaultTransaction: true,
+			NowFunc: func() time.Time {
+				return now
+			},
+		},
+	}
+
+	s := &LoginSource{}
+	_ = s.BeforeUpdate(db)
+	assert.Equal(t, db.NowFunc().Unix(), s.UpdatedUnix)
+}
+
+func TestLoginSource_AfterFind(t *testing.T) {
+	now := time.Now()
+	db := &gorm.DB{
+		Config: &gorm.Config{
+			SkipDefaultTransaction: true,
+			NowFunc: func() time.Time {
+				return now
+			},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		authType auth.Type
+		wantType any
+	}{
+		{
+			name:     "LDAP",
+			authType: auth.LDAP,
+			wantType: &ldap.Provider{},
+		},
+		{
+			name:     "DLDAP",
+			authType: auth.DLDAP,
+			wantType: &ldap.Provider{},
+		},
+		{
+			name:     "SMTP",
+			authType: auth.SMTP,
+			wantType: &smtp.Provider{},
+		},
+		{
+			name:     "PAM",
+			authType: auth.PAM,
+			wantType: &pam.Provider{},
+		},
+		{
+			name:     "GitHub",
+			authType: auth.GitHub,
+			wantType: &github.Provider{},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			s := LoginSource{
+				Type:        test.authType,
+				Config:      `{}`,
+				CreatedUnix: now.Unix(),
+				UpdatedUnix: now.Unix(),
+			}
+			err := s.AfterFind(db)
+			require.NoError(t, err)
+
+			assert.Equal(t, s.CreatedUnix, s.Created.Unix())
+			assert.Equal(t, s.UpdatedUnix, s.Updated.Unix())
+			assert.IsType(t, test.wantType, s.Provider)
+		})
+	}
+}
+
+func TestLoginSources(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
-
 	t.Parallel()
 
-	tables := []interface{}{new(LoginSource), new(User)}
+	tables := []any{new(LoginSource), new(User)}
 	db := &loginSources{
 		DB: dbtest.NewDB(t, "loginSources", tables...),
 	}
 
 	for _, tc := range []struct {
 		name string
-		test func(*testing.T, *loginSources)
+		test func(t *testing.T, db *loginSources)
 	}{
 		{"Create", loginSourcesCreate},
 		{"Count", loginSourcesCount},
@@ -119,7 +198,7 @@ func loginSourcesCreate(t *testing.T, db *loginSources) {
 
 	// Create first login source with name "GitHub"
 	source, err := db.Create(ctx,
-		CreateLoginSourceOpts{
+		CreateLoginSourceOptions{
 			Type:      auth.GitHub,
 			Name:      "GitHub",
 			Activated: true,
@@ -138,7 +217,7 @@ func loginSourcesCreate(t *testing.T, db *loginSources) {
 	assert.Equal(t, db.NowFunc().Format(time.RFC3339), source.Updated.UTC().Format(time.RFC3339))
 
 	// Try create second login source with same name should fail
-	_, err = db.Create(ctx, CreateLoginSourceOpts{Name: source.Name})
+	_, err = db.Create(ctx, CreateLoginSourceOptions{Name: source.Name})
 	wantErr := ErrLoginSourceAlreadyExist{args: errutil.Args{"name": source.Name}}
 	assert.Equal(t, wantErr, err)
 }
@@ -148,7 +227,7 @@ func loginSourcesCount(t *testing.T, db *loginSources) {
 
 	// Create two login sources, one in database and one as source file.
 	_, err := db.Create(ctx,
-		CreateLoginSourceOpts{
+		CreateLoginSourceOptions{
 			Type:      auth.GitHub,
 			Name:      "GitHub",
 			Activated: true,
@@ -172,7 +251,7 @@ func loginSourcesDeleteByID(t *testing.T, db *loginSources) {
 
 	t.Run("delete but in used", func(t *testing.T) {
 		source, err := db.Create(ctx,
-			CreateLoginSourceOpts{
+			CreateLoginSourceOptions{
 				Type:      auth.GitHub,
 				Name:      "GitHub",
 				Activated: true,
@@ -186,7 +265,7 @@ func loginSourcesDeleteByID(t *testing.T, db *loginSources) {
 
 		// Create a user that uses this login source
 		_, err = (&users{DB: db.DB}).Create(ctx, "alice", "",
-			CreateUserOpts{
+			CreateUserOptions{
 				LoginSource: source.ID,
 			},
 		)
@@ -206,7 +285,7 @@ func loginSourcesDeleteByID(t *testing.T, db *loginSources) {
 
 	// Create a login source with name "GitHub2"
 	source, err := db.Create(ctx,
-		CreateLoginSourceOpts{
+		CreateLoginSourceOptions{
 			Type:      auth.GitHub,
 			Name:      "GitHub2",
 			Activated: true,
@@ -254,7 +333,7 @@ func loginSourcesGetByID(t *testing.T, db *loginSources) {
 
 	// Create a login source with name "GitHub"
 	source, err := db.Create(ctx,
-		CreateLoginSourceOpts{
+		CreateLoginSourceOptions{
 			Type:      auth.GitHub,
 			Name:      "GitHub",
 			Activated: true,
@@ -278,7 +357,7 @@ func loginSourcesList(t *testing.T, db *loginSources) {
 	ctx := context.Background()
 
 	mock := NewMockLoginSourceFilesStore()
-	mock.ListFunc.SetDefaultHook(func(opts ListLoginSourceOpts) []*LoginSource {
+	mock.ListFunc.SetDefaultHook(func(opts ListLoginSourceOptions) []*LoginSource {
 		if opts.OnlyActivated {
 			return []*LoginSource{
 				{ID: 1},
@@ -293,7 +372,7 @@ func loginSourcesList(t *testing.T, db *loginSources) {
 
 	// Create two login sources in database, one activated and the other one not
 	_, err := db.Create(ctx,
-		CreateLoginSourceOpts{
+		CreateLoginSourceOptions{
 			Type: auth.PAM,
 			Name: "PAM",
 			Config: &pam.Config{
@@ -303,7 +382,7 @@ func loginSourcesList(t *testing.T, db *loginSources) {
 	)
 	require.NoError(t, err)
 	_, err = db.Create(ctx,
-		CreateLoginSourceOpts{
+		CreateLoginSourceOptions{
 			Type:      auth.GitHub,
 			Name:      "GitHub",
 			Activated: true,
@@ -315,12 +394,12 @@ func loginSourcesList(t *testing.T, db *loginSources) {
 	require.NoError(t, err)
 
 	// List all login sources
-	sources, err := db.List(ctx, ListLoginSourceOpts{})
+	sources, err := db.List(ctx, ListLoginSourceOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, 4, len(sources), "number of sources")
 
 	// Only list activated login sources
-	sources, err = db.List(ctx, ListLoginSourceOpts{OnlyActivated: true})
+	sources, err = db.List(ctx, ListLoginSourceOptions{OnlyActivated: true})
 	require.NoError(t, err)
 	assert.Equal(t, 2, len(sources), "number of sources")
 }
@@ -329,7 +408,7 @@ func loginSourcesResetNonDefault(t *testing.T, db *loginSources) {
 	ctx := context.Background()
 
 	mock := NewMockLoginSourceFilesStore()
-	mock.ListFunc.SetDefaultHook(func(opts ListLoginSourceOpts) []*LoginSource {
+	mock.ListFunc.SetDefaultHook(func(opts ListLoginSourceOptions) []*LoginSource {
 		mockFile := NewMockLoginSourceFileStore()
 		mockFile.SetGeneralFunc.SetDefaultHook(func(name, value string) {
 			assert.Equal(t, "is_default", name)
@@ -345,7 +424,7 @@ func loginSourcesResetNonDefault(t *testing.T, db *loginSources) {
 
 	// Create two login sources both have default on
 	source1, err := db.Create(ctx,
-		CreateLoginSourceOpts{
+		CreateLoginSourceOptions{
 			Type:    auth.PAM,
 			Name:    "PAM",
 			Default: true,
@@ -356,7 +435,7 @@ func loginSourcesResetNonDefault(t *testing.T, db *loginSources) {
 	)
 	require.NoError(t, err)
 	source2, err := db.Create(ctx,
-		CreateLoginSourceOpts{
+		CreateLoginSourceOptions{
 			Type:      auth.GitHub,
 			Name:      "GitHub",
 			Activated: true,
@@ -388,7 +467,7 @@ func loginSourcesSave(t *testing.T, db *loginSources) {
 	t.Run("save to database", func(t *testing.T) {
 		// Create a login source with name "GitHub"
 		source, err := db.Create(ctx,
-			CreateLoginSourceOpts{
+			CreateLoginSourceOptions{
 				Type:      auth.GitHub,
 				Name:      "GitHub",
 				Activated: true,

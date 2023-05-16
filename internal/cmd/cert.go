@@ -1,5 +1,4 @@
 //go:build cert
-// +build cert
 
 // Copyright 2009 The Go Authors. All rights reserved.
 // Copyright 2014 The Gogs Authors. All rights reserved.
@@ -42,7 +41,7 @@ Outputs to 'cert.pem' and 'key.pem' and will overwrite existing files.`,
 	},
 }
 
-func publicKey(priv interface{}) interface{} {
+func publicKey(priv any) any {
 	switch k := priv.(type) {
 	case *rsa.PrivateKey:
 		return &k.PublicKey
@@ -53,7 +52,7 @@ func publicKey(priv interface{}) interface{} {
 	}
 }
 
-func pemBlockForKey(priv interface{}) *pem.Block {
+func pemBlockForKey(priv any) *pem.Block {
 	switch k := priv.(type) {
 	case *rsa.PrivateKey:
 		return &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(k)}
@@ -73,7 +72,7 @@ func runCert(ctx *cli.Context) error {
 		log.Fatal("Missing required --host parameter")
 	}
 
-	var priv interface{}
+	var priv any
 	var err error
 	switch ctx.String("ecdsa-curve") {
 	case "":

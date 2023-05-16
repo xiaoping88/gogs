@@ -23,7 +23,7 @@ import (
 // NewDB creates a new test database and initializes the given list of tables
 // for the suite. The test database is dropped after testing is completed unless
 // failed.
-func NewDB(t *testing.T, suite string, tables ...interface{}) *gorm.DB {
+func NewDB(t *testing.T, suite string, tables ...any) *gorm.DB {
 	dbType := os.Getenv("GOGS_DATABASE_TYPE")
 
 	var dbName string
@@ -55,8 +55,8 @@ func NewDB(t *testing.T, suite string, tables ...interface{}) *gorm.DB {
 
 		dbOpts.Name = dbName
 
-		cleanup = func(db *gorm.DB) {
-			db.Exec(fmt.Sprintf("DROP DATABASE `%s`", dbName))
+		cleanup = func(_ *gorm.DB) {
+			_, _ = sqlDB.Exec(fmt.Sprintf("DROP DATABASE `%s`", dbName))
 			_ = sqlDB.Close()
 		}
 	case "postgres":
@@ -86,8 +86,8 @@ func NewDB(t *testing.T, suite string, tables ...interface{}) *gorm.DB {
 
 		dbOpts.Name = dbName
 
-		cleanup = func(db *gorm.DB) {
-			db.Exec(fmt.Sprintf(`DROP DATABASE %q`, dbName))
+		cleanup = func(_ *gorm.DB) {
+			_, _ = sqlDB.Exec(fmt.Sprintf(`DROP DATABASE %q`, dbName))
 			_ = sqlDB.Close()
 		}
 	case "sqlite":

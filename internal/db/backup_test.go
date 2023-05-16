@@ -29,11 +29,11 @@ func TestDumpAndImport(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
-
 	t.Parallel()
 
-	if len(Tables) != 4 {
-		t.Fatalf("New table has added (want 4 got %d), please add new tests for the table and update this check", len(Tables))
+	const wantTables = 7
+	if len(Tables) != wantTables {
+		t.Fatalf("New table has added (want %d got %d), please add new tests for the table and update this check", wantTables, len(Tables))
 	}
 
 	db := dbtest.NewDB(t, "dumpAndImport", Tables...)
@@ -46,7 +46,7 @@ func TestDumpAndImport(t *testing.T) {
 }
 
 func setupDBToDump(t *testing.T, db *gorm.DB) {
-	vals := []interface{}{
+	vals := []any{
 		&Access{
 			ID:     1,
 			UserID: 1,
@@ -88,6 +88,72 @@ func setupDBToDump(t *testing.T, db *gorm.DB) {
 			Sha1:        cryptoutil.SHA256(cryptoutil.SHA1("1b2dccd1-a262-470f-bb8c-7fc73192e9bb"))[:40],
 			SHA256:      cryptoutil.SHA256(cryptoutil.SHA1("1b2dccd1-a262-470f-bb8c-7fc73192e9bb")),
 			CreatedUnix: 1588568886,
+		},
+
+		&Action{
+			ID:           1,
+			UserID:       1,
+			OpType:       ActionCreateBranch,
+			ActUserID:    1,
+			ActUserName:  "alice",
+			RepoID:       1,
+			RepoUserName: "alice",
+			RepoName:     "example",
+			RefName:      "main",
+			IsPrivate:    false,
+			Content:      `{"Len":1,"Commits":[],"CompareURL":""}`,
+			CreatedUnix:  1588568886,
+		},
+		&Action{
+			ID:           2,
+			UserID:       1,
+			OpType:       ActionCommitRepo,
+			ActUserID:    1,
+			ActUserName:  "alice",
+			RepoID:       1,
+			RepoUserName: "alice",
+			RepoName:     "example",
+			RefName:      "main",
+			IsPrivate:    false,
+			Content:      `{"Len":1,"Commits":[],"CompareURL":""}`,
+			CreatedUnix:  1588568886,
+		},
+		&Action{
+			ID:           3,
+			UserID:       1,
+			OpType:       ActionDeleteBranch,
+			ActUserID:    1,
+			ActUserName:  "alice",
+			RepoID:       1,
+			RepoUserName: "alice",
+			RepoName:     "example",
+			RefName:      "main",
+			IsPrivate:    false,
+			CreatedUnix:  1588568886,
+		},
+
+		&EmailAddress{
+			ID:          1,
+			UserID:      1,
+			Email:       "alice@example.com",
+			IsActivated: false,
+		},
+		&EmailAddress{
+			ID:          2,
+			UserID:      2,
+			Email:       "bob@example.com",
+			IsActivated: true,
+		},
+
+		&Follow{
+			ID:       1,
+			UserID:   1,
+			FollowID: 2,
+		},
+		&Follow{
+			ID:       2,
+			UserID:   2,
+			FollowID: 1,
 		},
 
 		&LFSObject{

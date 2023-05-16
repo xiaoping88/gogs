@@ -25,15 +25,13 @@ import (
 )
 
 // loginSourceFilesStore is the in-memory interface for login source files stored on file system.
-//
-// NOTE: All methods are sorted in alphabetical order.
 type loginSourceFilesStore interface {
 	// GetByID returns a clone of login source by given ID.
 	GetByID(id int64) (*LoginSource, error)
 	// Len returns number of login sources.
 	Len() int
 	// List returns a list of login sources filtered by options.
-	List(opts ListLoginSourceOpts) []*LoginSource
+	List(opts ListLoginSourceOptions) []*LoginSource
 	// Update updates in-memory copy of the authentication source.
 	Update(source *LoginSource)
 }
@@ -85,7 +83,7 @@ func (s *loginSourceFiles) Len() int {
 	return len(s.sources)
 }
 
-func (s *loginSourceFiles) List(opts ListLoginSourceOpts) []*LoginSource {
+func (s *loginSourceFiles) List(opts ListLoginSourceOptions) []*LoginSource {
 	s.RLock()
 	defer s.RUnlock()
 
@@ -220,7 +218,7 @@ type loginSourceFileStore interface {
 	// SetGeneral sets new value to the given key in the general (default) section.
 	SetGeneral(name, value string)
 	// SetConfig sets new values to the "config" section.
-	SetConfig(cfg interface{}) error
+	SetConfig(cfg any) error
 	// Save persists values to file system.
 	Save() error
 }
@@ -236,7 +234,7 @@ func (f *loginSourceFile) SetGeneral(name, value string) {
 	f.file.Section("").Key(name).SetValue(value)
 }
 
-func (f *loginSourceFile) SetConfig(cfg interface{}) error {
+func (f *loginSourceFile) SetConfig(cfg any) error {
 	return f.file.Section("config").ReflectFrom(cfg)
 }
 

@@ -21,17 +21,16 @@ func TestLFS(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
-
 	t.Parallel()
 
-	tables := []interface{}{new(LFSObject)}
+	tables := []any{new(LFSObject)}
 	db := &lfs{
 		DB: dbtest.NewDB(t, "lfs", tables...),
 	}
 
 	for _, tc := range []struct {
 		name string
-		test func(*testing.T, *lfs)
+		test func(t *testing.T, db *lfs)
 	}{
 		{"CreateObject", lfsCreateObject},
 		{"GetObjectByOID", lfsGetObjectByOID},

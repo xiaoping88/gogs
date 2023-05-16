@@ -5,6 +5,7 @@
 package db
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -245,7 +246,9 @@ func (t *Team) RemoveRepository(repoID int64) error {
 	return sess.Commit()
 }
 
-var reservedTeamNames = []string{"new"}
+var reservedTeamNames = map[string]struct{}{
+	"new": {},
+}
 
 // IsUsableTeamName return an error if given name is a reserved name or pattern.
 func IsUsableTeamName(name string) error {
@@ -301,7 +304,7 @@ func NewTeam(t *Team) error {
 var _ errutil.NotFound = (*ErrTeamNotExist)(nil)
 
 type ErrTeamNotExist struct {
-	args map[string]interface{}
+	args map[string]any
 }
 
 func IsErrTeamNotExist(err error) bool {
@@ -326,7 +329,7 @@ func getTeamOfOrgByName(e Engine, orgID int64, name string) (*Team, error) {
 	if err != nil {
 		return nil, err
 	} else if !has {
-		return nil, ErrTeamNotExist{args: map[string]interface{}{"orgID": orgID, "name": name}}
+		return nil, ErrTeamNotExist{args: map[string]any{"orgID": orgID, "name": name}}
 	}
 	return t, nil
 }
@@ -342,7 +345,7 @@ func getTeamByID(e Engine, teamID int64) (*Team, error) {
 	if err != nil {
 		return nil, err
 	} else if !has {
-		return nil, ErrTeamNotExist{args: map[string]interface{}{"teamID": teamID}}
+		return nil, ErrTeamNotExist{args: map[string]any{"teamID": teamID}}
 	}
 	return t, nil
 }
@@ -415,7 +418,7 @@ func DeleteTeam(t *Team) error {
 	}
 
 	// Get organization.
-	org, err := GetUserByID(t.OrgID)
+	org, err := Users.GetByID(context.TODO(), t.OrgID)
 	if err != nil {
 		return err
 	}

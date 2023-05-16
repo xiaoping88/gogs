@@ -5,6 +5,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -51,8 +52,8 @@ to make automatic initialization process more smoothly`,
 		Name:  "delete-inactive-users",
 		Usage: "Delete all inactive accounts",
 		Action: adminDashboardOperation(
-			db.DeleteInactivateUsers,
-			"All inactivate accounts have been deleted successfully",
+			func() error { return db.Users.DeleteInactivated() },
+			"All inactivated accounts have been deleted successfully",
 		),
 		Flags: []cli.Flag{
 			stringFlag("config, c", "", "Custom configuration file path"),
@@ -151,17 +152,21 @@ func runCreateUser(c *cli.Context) error {
 		return errors.Wrap(err, "set engine")
 	}
 
-	if err := db.CreateUser(&db.User{
-		Name:     c.String("name"),
-		Email:    c.String("email"),
-		Passwd:   c.String("password"),
-		IsActive: true,
-		IsAdmin:  c.Bool("admin"),
-	}); err != nil {
-		return fmt.Errorf("CreateUser: %v", err)
+	user, err := db.Users.Create(
+		context.Background(),
+		c.String("name"),
+		c.String("email"),
+		db.CreateUserOptions{
+			Password:  c.String("password"),
+			Activated: true,
+			Admin:     c.Bool("admin"),
+		},
+	)
+	if err != nil {
+		return errors.Wrap(err, "create user")
 	}
 
-	fmt.Printf("New user '%s' has been successfully created!\n", c.String("name"))
+	fmt.Printf("New user %q has been successfully created!\n", user.Name)
 	return nil
 }
 

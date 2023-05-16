@@ -28,23 +28,23 @@ import (
 
 // Engine represents a XORM engine or session.
 type Engine interface {
-	Delete(interface{}) (int64, error)
-	Exec(...interface{}) (sql.Result, error)
-	Find(interface{}, ...interface{}) error
-	Get(interface{}) (bool, error)
-	ID(interface{}) *xorm.Session
-	In(string, ...interface{}) *xorm.Session
-	Insert(...interface{}) (int64, error)
-	InsertOne(interface{}) (int64, error)
-	Iterate(interface{}, xorm.IterFunc) error
-	Sql(string, ...interface{}) *xorm.Session
-	Table(interface{}) *xorm.Session
-	Where(interface{}, ...interface{}) *xorm.Session
+	Delete(any) (int64, error)
+	Exec(...any) (sql.Result, error)
+	Find(any, ...any) error
+	Get(any) (bool, error)
+	ID(any) *xorm.Session
+	In(string, ...any) *xorm.Session
+	Insert(...any) (int64, error)
+	InsertOne(any) (int64, error)
+	Iterate(any, xorm.IterFunc) error
+	Sql(string, ...any) *xorm.Session
+	Table(any) *xorm.Session
+	Where(any, ...any) *xorm.Session
 }
 
 var (
 	x            *xorm.Engine
-	legacyTables []interface{}
+	legacyTables []any
 	HasEngine    bool
 )
 
@@ -52,13 +52,13 @@ func init() {
 	legacyTables = append(legacyTables,
 		new(User), new(PublicKey), new(TwoFactor), new(TwoFactorRecoveryCode),
 		new(Repository), new(DeployKey), new(Collaboration), new(Upload),
-		new(Watch), new(Star), new(Follow), new(Action),
+		new(Watch), new(Star),
 		new(Issue), new(PullRequest), new(Comment), new(Attachment), new(IssueUser),
 		new(Label), new(IssueLabel), new(Milestone),
 		new(Mirror), new(Release), new(Webhook), new(HookTask),
 		new(ProtectBranch), new(ProtectBranchWhitelist),
 		new(Team), new(OrgUser), new(TeamUser), new(TeamRepo),
-		new(Notice), new(EmailAddress))
+		new(Notice))
 
 	gonicNames := []string{"SSL"}
 	for _, name := range gonicNames {
@@ -163,7 +163,7 @@ func SetEngine() (*gorm.DB, error) {
 	x.SetConnMaxLifetime(time.Second)
 
 	if conf.IsProdMode() {
-		x.SetLogger(xorm.NewSimpleLogger3(fileWriter, xorm.DEFAULT_LOG_PREFIX, xorm.DEFAULT_LOG_FLAG, core.LOG_WARNING))
+		x.SetLogger(xorm.NewSimpleLogger3(fileWriter, xorm.DEFAULT_LOG_PREFIX, xorm.DEFAULT_LOG_FLAG, core.LOG_ERR))
 	} else {
 		x.SetLogger(xorm.NewSimpleLogger(fileWriter))
 	}
@@ -210,7 +210,7 @@ type Statistic struct {
 }
 
 func GetStatistic(ctx context.Context) (stats Statistic) {
-	stats.Counter.User = CountUsers()
+	stats.Counter.User = Users.Count(ctx)
 	stats.Counter.Org = CountOrganizations()
 	stats.Counter.PublicKey, _ = x.Count(new(PublicKey))
 	stats.Counter.Repo = CountRepositories(true)

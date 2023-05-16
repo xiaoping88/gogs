@@ -40,8 +40,10 @@ func newLogWriter() (logger.Writer, error) {
 // Tables is the list of struct-to-table mappings.
 //
 // NOTE: Lines are sorted in alphabetical order, each letter in its own line.
-var Tables = []interface{}{
-	new(Access), new(AccessToken),
+var Tables = []any{
+	new(Access), new(AccessToken), new(Action),
+	new(EmailAddress),
+	new(Follow),
 	new(LFSObject), new(LoginSource),
 }
 
@@ -119,12 +121,14 @@ func Init(w logger.Writer) (*gorm.DB, error) {
 
 	// Initialize stores, sorted in alphabetical order.
 	AccessTokens = &accessTokens{DB: db}
+	Actions = NewActionsStore(db)
 	LoginSources = &loginSources{DB: db, files: sourceFiles}
 	LFS = &lfs{DB: db}
-	Perms = &perms{DB: db}
-	Repos = &repos{DB: db}
+	Orgs = NewOrgsStore(db)
+	Perms = NewPermsStore(db)
+	Repos = NewReposStore(db)
 	TwoFactors = &twoFactors{DB: db}
-	Users = &users{DB: db}
+	Users = NewUsersStore(db)
 
 	return db, nil
 }

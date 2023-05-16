@@ -68,7 +68,7 @@ func MustAllowPulls(c *context.Context) {
 	}
 
 	// User can send pull request if owns a forked repository.
-	if c.IsLogged && c.User.HasForkedRepo(c.Repo.Repository.ID) {
+	if c.IsLogged && db.Repos.HasForkedBy(c.Req.Context(), c.Repo.Repository.ID, c.User.ID) {
 		c.Repo.PullRequest.Allowed = true
 		c.Repo.PullRequest.HeadInfo = c.User.Name + ":" + c.Repo.BranchName
 	}
@@ -612,7 +612,16 @@ func viewIssue(c *context.Context, isPullList bool) {
 			if repo.IsOwnedBy(comment.PosterID) ||
 				(repo.Owner.IsOrganization() && repo.Owner.IsOwnedBy(comment.PosterID)) {
 				comment.ShowTag = db.COMMENT_TAG_OWNER
-			} else if comment.Poster.IsWriterOfRepo(repo) {
+			} else if db.Perms.Authorize(
+				c.Req.Context(),
+				comment.PosterID,
+				repo.ID,
+				db.AccessModeWrite,
+				db.AccessModeOptions{
+					OwnerID: repo.OwnerID,
+					Private: repo.IsPrivate,
+				},
+			) {
 				comment.ShowTag = db.COMMENT_TAG_WRITER
 			} else if comment.PosterID == issue.PosterID {
 				comment.ShowTag = db.COMMENT_TAG_POSTER
@@ -710,7 +719,7 @@ func UpdateIssueTitle(c *context.Context) {
 		return
 	}
 
-	c.JSONSuccess(map[string]interface{}{
+	c.JSONSuccess(map[string]any{
 		"title": issue.Title,
 	})
 }
@@ -769,7 +778,7 @@ func UpdateIssueLabel(c *context.Context) {
 		}
 	}
 
-	c.JSONSuccess(map[string]interface{}{
+	c.JSONSuccess(map[string]any{
 		"ok": true,
 	})
 }
@@ -783,7 +792,7 @@ func UpdateIssueMilestone(c *context.Context) {
 	oldMilestoneID := issue.MilestoneID
 	milestoneID := c.QueryInt64("id")
 	if oldMilestoneID == milestoneID {
-		c.JSONSuccess(map[string]interface{}{
+		c.JSONSuccess(map[string]any{
 			"ok": true,
 		})
 		return
@@ -796,7 +805,7 @@ func UpdateIssueMilestone(c *context.Context) {
 		return
 	}
 
-	c.JSONSuccess(map[string]interface{}{
+	c.JSONSuccess(map[string]any{
 		"ok": true,
 	})
 }
@@ -809,7 +818,7 @@ func UpdateIssueAssignee(c *context.Context) {
 
 	assigneeID := c.QueryInt64("id")
 	if issue.AssigneeID == assigneeID {
-		c.JSONSuccess(map[string]interface{}{
+		c.JSONSuccess(map[string]any{
 			"ok": true,
 		})
 		return
@@ -820,7 +829,7 @@ func UpdateIssueAssignee(c *context.Context) {
 		return
 	}
 
-	c.JSONSuccess(map[string]interface{}{
+	c.JSONSuccess(map[string]any{
 		"ok": true,
 	})
 }
@@ -934,7 +943,7 @@ func UpdateCommentContent(c *context.Context) {
 	oldContent := comment.Content
 	comment.Content = c.Query("content")
 	if comment.Content == "" {
-		c.JSONSuccess(map[string]interface{}{
+		c.JSONSuccess(map[string]any{
 			"content": "",
 		})
 		return
@@ -1053,7 +1062,7 @@ func DeleteLabel(c *context.Context) {
 		c.Flash.Success(c.Tr("repo.issues.label_deletion_success"))
 	}
 
-	c.JSONSuccess(map[string]interface{}{
+	c.JSONSuccess(map[string]any{
 		"redirect": c.Repo.MakeURL("labels"),
 	})
 }
@@ -1251,7 +1260,7 @@ func DeleteMilestone(c *context.Context) {
 		c.Flash.Success(c.Tr("repo.milestones.deletion_success"))
 	}
 
-	c.JSONSuccess(map[string]interface{}{
+	c.JSONSuccess(map[string]any{
 		"redirect": c.Repo.MakeURL("milestones"),
 	})
 }

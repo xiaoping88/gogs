@@ -5,14 +5,17 @@
 package db
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/unknwon/com"
 	log "unknwon.dev/clog/v2"
 
 	"gogs.io/gogs/internal/conf"
 	"gogs.io/gogs/internal/email"
 	"gogs.io/gogs/internal/markup"
+	"gogs.io/gogs/internal/userutil"
 )
 
 func (issue *Issue) MailSubject() string {
@@ -36,12 +39,14 @@ func (this mailerUser) Email() string {
 	return this.user.Email
 }
 
-func (this mailerUser) GenerateActivateCode() string {
-	return this.user.GenerateActivateCode()
-}
-
 func (this mailerUser) GenerateEmailActivateCode(email string) string {
-	return this.user.GenerateEmailActivateCode(email)
+	return userutil.GenerateActivateCode(
+		this.user.ID,
+		email,
+		this.user.Name,
+		this.user.Password,
+		this.user.Rands,
+	)
 }
 
 func NewMailerUser(u *User) email.User {
@@ -95,6 +100,8 @@ func NewMailerIssue(issue *Issue) email.Issue {
 // 1. Repository watchers, users who participated in comments and the assignee.
 // 2. Users who are not in 1. but get mentioned in current issue/comment.
 func mailIssueCommentToParticipants(issue *Issue, doer *User, mentions []string) error {
+	ctx := context.TODO()
+
 	if !conf.User.EnableEmailNotification {
 		return nil
 	}
@@ -121,7 +128,7 @@ func mailIssueCommentToParticipants(issue *Issue, doer *User, mentions []string)
 			continue
 		}
 
-		to, err := GetUserByID(watchers[i].UserID)
+		to, err := Users.GetByID(ctx, watchers[i].UserID)
 		if err != nil {
 			return fmt.Errorf("GetUserByID [%d]: %v", watchers[i].UserID, err)
 		}
@@ -152,15 +159,20 @@ func mailIssueCommentToParticipants(issue *Issue, doer *User, mentions []string)
 
 	// Mail mentioned people and exclude watchers.
 	names = append(names, doer.Name)
-	tos = make([]string, 0, len(mentions)) // list of user names.
+	toUsernames := make([]string, 0, len(mentions)) // list of user names.
 	for i := range mentions {
 		if com.IsSliceContainsStr(names, mentions[i]) {
 			continue
 		}
 
-		tos = append(tos, mentions[i])
+		toUsernames = append(toUsernames, mentions[i])
 	}
-	email.SendIssueMentionMail(NewMailerIssue(issue), NewMailerRepo(issue.Repo), NewMailerUser(doer), GetUserEmailsByNames(tos))
+
+	tos, err = Users.GetMailableEmailsByUsernames(ctx, toUsernames)
+	if err != nil {
+		return errors.Wrap(err, "get mailable emails by usernames")
+	}
+	email.SendIssueMentionMail(NewMailerIssue(issue), NewMailerRepo(issue.Repo), NewMailerUser(doer), tos)
 	return nil
 }
 

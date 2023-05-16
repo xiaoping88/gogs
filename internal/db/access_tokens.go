@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
 	gouuid "github.com/satori/go.uuid"
 	"gorm.io/gorm"
 
@@ -17,8 +18,6 @@ import (
 )
 
 // AccessTokensStore is the persistent interface for access tokens.
-//
-// NOTE: All methods are sorted in alphabetical order.
 type AccessTokensStore interface {
 	// Create creates a new access token and persist to database. It returns
 	// ErrAccessTokenAlreadyExist when an access token with same name already exists
@@ -42,7 +41,7 @@ var AccessTokens AccessTokensStore
 
 // AccessToken is a personal access token.
 type AccessToken struct {
-	ID     int64
+	ID     int64 `gorm:"primarykey"`
 	UserID int64 `xorm:"uid" gorm:"column:uid;index"`
 	Name   string
 	Sha1   string `gorm:"type:VARCHAR(40);unique"`
@@ -67,9 +66,11 @@ func (t *AccessToken) BeforeCreate(tx *gorm.DB) error {
 // AfterFind implements the GORM query hook.
 func (t *AccessToken) AfterFind(tx *gorm.DB) error {
 	t.Created = time.Unix(t.CreatedUnix, 0).Local()
-	t.Updated = time.Unix(t.UpdatedUnix, 0).Local()
-	t.HasUsed = t.Updated.After(t.Created)
-	t.HasRecentActivity = t.Updated.Add(7 * 24 * time.Hour).After(tx.NowFunc())
+	if t.UpdatedUnix > 0 {
+		t.Updated = time.Unix(t.UpdatedUnix, 0).Local()
+		t.HasUsed = t.Updated.After(t.Created)
+		t.HasRecentActivity = t.Updated.Add(7 * 24 * time.Hour).After(tx.NowFunc())
+	}
 	return nil
 }
 
@@ -128,8 +129,10 @@ type ErrAccessTokenNotExist struct {
 	args errutil.Args
 }
 
+// IsErrAccessTokenNotExist returns true if the underlying error has the type
+// ErrAccessTokenNotExist.
 func IsErrAccessTokenNotExist(err error) bool {
-	_, ok := err.(ErrAccessTokenNotExist)
+	_, ok := errors.Cause(err).(ErrAccessTokenNotExist)
 	return ok
 }
 
@@ -142,6 +145,11 @@ func (ErrAccessTokenNotExist) NotFound() bool {
 }
 
 func (db *accessTokens) GetBySHA1(ctx context.Context, sha1 string) (*AccessToken, error) {
+	// No need to waste a query for an empty SHA1.
+	if sha1 == "" {
+		return nil, ErrAccessTokenNotExist{args: errutil.Args{"sha": sha1}}
+	}
+
 	sha256 := cryptoutil.SHA256(sha1)
 	token := new(AccessToken)
 	err := db.WithContext(ctx).Where("sha256 = ?", sha256).First(token).Error

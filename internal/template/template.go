@@ -27,6 +27,7 @@ import (
 	"gogs.io/gogs/internal/db"
 	"gogs.io/gogs/internal/gitutil"
 	"gogs.io/gogs/internal/markup"
+	"gogs.io/gogs/internal/strutil"
 	"gogs.io/gogs/internal/tool"
 )
 
@@ -38,7 +39,7 @@ var (
 // FuncMap returns a list of user-defined template functions.
 func FuncMap() []template.FuncMap {
 	funcMapOnce.Do(func() {
-		funcMap = []template.FuncMap{map[string]interface{}{
+		funcMap = []template.FuncMap{map[string]any{
 			"BuildCommit": func() string {
 				return conf.BuildCommit
 			},
@@ -106,7 +107,7 @@ func FuncMap() []template.FuncMap {
 				return str[start:end]
 			},
 			"Join":                  strings.Join,
-			"EllipsisString":        tool.EllipsisString,
+			"EllipsisString":        strutil.Ellipsis,
 			"DiffFileTypeToStr":     DiffFileTypeToStr,
 			"DiffLineTypeToStr":     DiffLineTypeToStr,
 			"Sha1":                  Sha1,

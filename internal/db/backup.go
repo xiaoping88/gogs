@@ -26,7 +26,7 @@ import (
 
 // getTableType returns the type name of a table definition without package name,
 // e.g. *db.LFSObject -> LFSObject.
-func getTableType(t interface{}) string {
+func getTableType(t any) string {
 	return strings.TrimPrefix(fmt.Sprintf("%T", t), "*db.")
 }
 
@@ -72,7 +72,7 @@ func DumpDatabase(ctx context.Context, db *gorm.DB, dirPath string, verbose bool
 	return nil
 }
 
-func dumpTable(ctx context.Context, db *gorm.DB, table interface{}, w io.Writer) error {
+func dumpTable(ctx context.Context, db *gorm.DB, table any, w io.Writer) error {
 	query := db.WithContext(ctx).Model(table)
 	switch table.(type) {
 	case *LFSObject:
@@ -128,7 +128,7 @@ func dumpLegacyTables(ctx context.Context, dirPath string, verbose bool) error {
 			return fmt.Errorf("create JSON file: %v", err)
 		}
 
-		if err = x.Context(ctx).Asc("id").Iterate(table, func(idx int, bean interface{}) (err error) {
+		if err = x.Context(ctx).Asc("id").Iterate(table, func(idx int, bean any) (err error) {
 			return jsoniter.NewEncoder(f).Encode(bean)
 		}); err != nil {
 			_ = f.Close()
@@ -181,7 +181,7 @@ func ImportDatabase(ctx context.Context, db *gorm.DB, dirPath string, verbose bo
 	return nil
 }
 
-func importTable(ctx context.Context, db *gorm.DB, table interface{}, r io.Reader) error {
+func importTable(ctx context.Context, db *gorm.DB, table any, r io.Reader) error {
 	err := db.WithContext(ctx).Migrator().DropTable(table)
 	if err != nil {
 		return errors.Wrap(err, "drop table")
@@ -221,7 +221,7 @@ func importTable(ctx context.Context, db *gorm.DB, table interface{}, r io.Reade
 	// PostgreSQL needs manually reset table sequence for auto increment keys
 	if conf.UsePostgreSQL && !skipResetIDSeq[rawTableName] {
 		seqName := rawTableName + "_id_seq"
-		if _, err = x.Context(ctx).Exec(fmt.Sprintf(`SELECT setval('%s', COALESCE((SELECT MAX(id)+1 FROM "%s"), 1), false);`, seqName, rawTableName)); err != nil {
+		if err = db.WithContext(ctx).Exec(fmt.Sprintf(`SELECT setval('%s', COALESCE((SELECT MAX(id)+1 FROM "%s"), 1), false)`, seqName, rawTableName)).Error; err != nil {
 			return errors.Wrapf(err, "reset table %q.%q", rawTableName, seqName)
 		}
 	}

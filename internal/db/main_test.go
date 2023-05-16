@@ -15,6 +15,7 @@ import (
 	_ "modernc.org/sqlite"
 	log "unknwon.dev/clog/v2"
 
+	"gogs.io/gogs/internal/conf"
 	"gogs.io/gogs/internal/testutil"
 )
 
@@ -37,11 +38,20 @@ func TestMain(m *testing.M) {
 	// NOTE: AutoMigrate does not respect logger passed in gorm.Config.
 	logger.Default = logger.Default.LogMode(level)
 
+	switch os.Getenv("GOGS_DATABASE_TYPE") {
+	case "mysql":
+		conf.UseMySQL = true
+	case "postgres":
+		conf.UsePostgreSQL = true
+	default:
+		conf.UseSQLite3 = true
+	}
+
 	os.Exit(m.Run())
 }
 
 // clearTables removes all rows from given tables.
-func clearTables(t *testing.T, db *gorm.DB, tables ...interface{}) error {
+func clearTables(t *testing.T, db *gorm.DB, tables ...any) error {
 	if t.Failed() {
 		return nil
 	}
